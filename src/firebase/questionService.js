@@ -190,14 +190,14 @@ export const deleteQuestion = async (id) => {
  * Get questions filtered by various criteria
  * @param {Object} filters - Filter criteria
  * @param {string} [filters.courseId] - Course ID to filter by
- * @param {string} [filters.topic] - Topic to filter by
+ * @param {Array<string>} [filters.topics] - Array of topics to filter by
  * @param {string} [filters.difficulty] - Difficulty level to filter by
  * @param {Array<string>} [filters.tagIds] - Array of tag IDs to filter by
  * @returns {Promise<Array>} - Array of question objects
  */
 export const getQuestionsByFilters = async (filters = {}) => {
   try {
-    const { courseId, topic, difficulty, tagIds } = filters;
+    const { courseId, topics, difficulty, tagIds } = filters;
     
     // Start with a base query on the collection
     let q = collection(db, COLLECTION_NAME);
@@ -206,10 +206,6 @@ export const getQuestionsByFilters = async (filters = {}) => {
     // Add filters based on provided criteria
     if (courseId) {
       constraints.push(where("course_id", "==", courseId));
-    }
-    
-    if (topic) {
-      constraints.push(where("topic", "==", topic));
     }
     
     if (difficulty) {
@@ -228,8 +224,20 @@ export const getQuestionsByFilters = async (filters = {}) => {
       ...doc.data()
     }));
     
-    // Filter by tags if specified (this needs to be done client-side because Firestore
-    // doesn't support array-contains-any with multiple array-contains conditions)
+    // Filter by topics if specified (client-side filtering for multiple topics)
+    if (topics && topics.length > 0) {
+      questions = questions.filter(question => {
+        // If no topic is specified on the question, it doesn't match
+        if (!question.topic) {
+          return false;
+        }
+        
+        // Check if the question's topic is in the specified topics array
+        return topics.includes(question.topic);
+      });
+    }
+    
+    // Filter by tags if specified (client-side filtering for multiple tags)
     if (tagIds && tagIds.length > 0) {
       questions = questions.filter(question => {
         // If the question has no tags, it doesn't match
