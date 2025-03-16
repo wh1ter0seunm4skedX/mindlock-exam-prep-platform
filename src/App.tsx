@@ -79,7 +79,7 @@ function App() {
           ) : (
             <Routes>
               <Route path="/" element={<Dashboard courses={courses} questions={questions} />} />
-              
+              <Route path="/dashboard" element={<Dashboard courses={courses} questions={questions} />} />
               <Route path="/courses" element={<CourseList courses={courses} setCourses={setCourses} />} />
               <Route path="/courses/new" element={<CourseForm setCourses={setCourses} />} />
               <Route path="/courses/edit/:id" element={<CourseForm courses={courses} setCourses={setCourses} />} />
