@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, query, where, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from './config';
 
 const COLLECTION_NAME = 'courses';
@@ -108,6 +108,47 @@ export const deleteCourse = async (id) => {
     return id;
   } catch (error) {
     console.error('Error deleting course:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete all courses from the database
+ * This will also delete all questions associated with these courses
+ * @returns {Promise<void>}
+ */
+export const deleteAllCourses = async () => {
+  try {
+    const batch = writeBatch(db);
+    
+    // Get all courses
+    const coursesRef = collection(db, COLLECTION_NAME);
+    const courseSnapshot = await getDocs(coursesRef);
+    
+    if (courseSnapshot.empty) {
+      return;
+    }
+    
+    // Delete all courses
+    courseSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // Get all questions
+    const questionsRef = collection(db, 'questions');
+    const questionSnapshot = await getDocs(questionsRef);
+    
+    // Delete all questions
+    if (!questionSnapshot.empty) {
+      questionSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+    }
+    
+    await batch.commit();
+    console.log(`Deleted ${courseSnapshot.size} courses and their associated questions`);
+  } catch (error) {
+    console.error("Error deleting all courses:", error);
     throw error;
   }
 };

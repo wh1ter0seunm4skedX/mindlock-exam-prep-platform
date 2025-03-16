@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, getDoc, query, where, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from './config';
 
 const COLLECTION_NAME = 'questions';
@@ -245,6 +245,32 @@ export const getQuestionsByFilters = async (filters = {}) => {
     return questions;
   } catch (error) {
     console.error("Error getting questions by filters:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete all questions from the database
+ * @returns {Promise<void>}
+ */
+export const deleteAllQuestions = async () => {
+  try {
+    const batch = writeBatch(db);
+    const questionsRef = collection(db, COLLECTION_NAME);
+    const snapshot = await getDocs(questionsRef);
+    
+    if (snapshot.empty) {
+      return;
+    }
+    
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    console.log(`Deleted ${snapshot.size} questions`);
+  } catch (error) {
+    console.error("Error deleting all questions:", error);
     throw error;
   }
 };

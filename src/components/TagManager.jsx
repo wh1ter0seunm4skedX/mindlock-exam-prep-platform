@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { addTag, updateTag, deleteTag, getTags } from '../firebase/tagService';
 
-const TagManager = ({ selectedTags = [], onChange, className = '' }) => {
+const TagManager = ({ selectedTags = [], onChange, className = '', showControls = false }) => {
   const [tags, setTags] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -175,22 +175,24 @@ const TagManager = ({ selectedTags = [], onChange, className = '' }) => {
                 >
                   {tag.name}
                 </span>
-                <div className="flex ml-1">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenModal(tag)}
-                    className="text-gray-400 hover:text-gray-500 p-1"
-                  >
-                    <PencilIcon className="h-3 w-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(tag.id)}
-                    className="text-gray-400 hover:text-red-500 p-1"
-                  >
-                    <TrashIcon className="h-3 w-3" />
-                  </button>
-                </div>
+                {showControls && (
+                  <div className="flex ml-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenModal(tag)}
+                      className="text-gray-400 hover:text-gray-500 p-1"
+                    >
+                      <PencilIcon className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(tag.id)}
+                      className="text-gray-400 hover:text-red-500 p-1"
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -298,7 +300,8 @@ const getContrastColor = (hexColor) => {
 TagManager.propTypes = {
   selectedTags: PropTypes.arrayOf(PropTypes.string),
   onChange: PropTypes.func.isRequired,
-  className: PropTypes.string
+  className: PropTypes.string,
+  showControls: PropTypes.bool
 };
 
 export default TagManager;
