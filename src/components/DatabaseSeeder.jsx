@@ -36,6 +36,7 @@ const DatabaseSeeder = () => {
   title: string,       // Course title (e.g., "Algorithms", "Probability")
   description: string, // Course description
   color: string,       // Hex color code for UI display
+  topics: array,       // Array of topic strings within the course
   created_date: timestamp, // When the course was created
   updated_date: timestamp, // When the course was last updated
   is_sample: boolean   // Whether this is a sample course
@@ -50,11 +51,21 @@ const DatabaseSeeder = () => {
   answer: string,      // Answer text (can include markdown/code)
   difficulty: string,  // "easy", "medium", or "hard"
   type: string,        // Question type (e.g., "concept", "implementation", "calculation")
+  topic: string,       // Topic from the parent course's topics array
+  tags: array,         // Array of tag IDs
   estimated_time: number, // Estimated time to answer (in minutes)
-  topics: array,       // Array of topic tags
   created_date: timestamp, // When the question was created
   updated_date: timestamp, // When the question was last updated
   is_sample: boolean   // Whether this is a sample question
+}
+
+// Collection: tags
+{
+  id: string,          // Auto-generated Firestore document ID
+  name: string,        // Tag name (e.g., "Important", "Review")
+  color: string,       // Hex color code for UI display
+  created_date: timestamp, // When the tag was created
+  updated_date: timestamp  // When the tag was last updated
 }`}
           </pre>
         </div>
@@ -66,10 +77,19 @@ const DatabaseSeeder = () => {
           <pre className="text-sm">
 {`// Two courses will be created:
 1. "Algorithms" (with indigo color)
-   - Contains 3 questions on topics like Big O notation, binary search, and data structures
+   - Topics: Time Complexity, Searching Algorithms, Sorting Algorithms, Data Structures, Dynamic Programming
+   - Contains 3 questions on different topics with tags
 
 2. "Probability" (with emerald color)
-   - Contains 3 questions on topics like Bayes' Theorem, expected value, and probability distributions
+   - Topics: Probability Basics, Conditional Probability, Distributions, Statistical Inference, Bayesian Statistics
+   - Contains 3 questions on different topics with tags
+
+// Five tags will be created:
+1. "Important" (red)
+2. "Review" (amber)
+3. "Theory" (violet)
+4. "Practice" (emerald)
+5. "Interview" (blue)
 
 // Each question includes:
 - Title
@@ -77,8 +97,9 @@ const DatabaseSeeder = () => {
 - Comprehensive answer
 - Difficulty level
 - Question type
-- Estimated completion time
-- Related topics`}
+- Topic from parent course
+- Associated tags
+- Estimated completion time`}
           </pre>
         </div>
       </div>
@@ -108,8 +129,8 @@ const DatabaseSeeder = () => {
         <div className="mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
           <p className="font-semibold">Success:</p>
           <p>{result.message}</p>
-          <p className="mt-2">
-            Created courses:
+          <div className="mt-2">
+            <p className="font-medium">Created courses:</p>
             <ul className="list-disc list-inside ml-2">
               {result.courses.map(course => (
                 <li key={course.id}>
@@ -117,7 +138,19 @@ const DatabaseSeeder = () => {
                 </li>
               ))}
             </ul>
-          </p>
+          </div>
+          {result.tags && (
+            <div className="mt-2">
+              <p className="font-medium">Created tags:</p>
+              <ul className="list-disc list-inside ml-2">
+                {result.tags.map(tag => (
+                  <li key={tag.id} style={{ color: tag.color }}>
+                    {tag.name} (ID: {tag.id})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -33,6 +33,43 @@ export const getQuestionsByCourse = async (courseId) => {
   }
 };
 
+// Get questions by topic
+export const getQuestionsByTopic = async (courseId, topic) => {
+  try {
+    const q = query(
+      collection(db, COLLECTION_NAME), 
+      where("course_id", "==", courseId),
+      where("topic", "==", topic)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting questions by topic:', error);
+    throw error;
+  }
+};
+
+// Get questions by tag
+export const getQuestionsByTag = async (tagId) => {
+  try {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where("tags", "array-contains", tagId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting questions by tag:', error);
+    throw error;
+  }
+};
+
 // Get a single question by ID
 export const getQuestionById = async (id) => {
   try {
@@ -66,9 +103,20 @@ export const addQuestion = async (questionData) => {
       }
     }
     
+    // Ensure tags is an array
+    let tags = questionData.tags || [];
+    if (typeof tags === 'string') {
+      try {
+        tags = JSON.parse(tags);
+      } catch (e) {
+        tags = [];
+      }
+    }
+    
     const newQuestion = {
       ...questionData,
       topics: topics || [],
+      tags: tags || [],
       created_date: serverTimestamp(),
       updated_date: serverTimestamp(),
       is_sample: false
@@ -98,10 +146,21 @@ export const updateQuestion = async (id, questionData) => {
       }
     }
     
+    // Ensure tags is an array
+    let tags = questionData.tags || [];
+    if (typeof tags === 'string') {
+      try {
+        tags = JSON.parse(tags);
+      } catch (e) {
+        tags = [];
+      }
+    }
+    
     const questionRef = doc(db, COLLECTION_NAME, id);
     const updatedData = {
       ...questionData,
       topics: topics || [],
+      tags: tags || [],
       updated_date: serverTimestamp()
     };
     
@@ -123,6 +182,69 @@ export const deleteQuestion = async (id) => {
     return id;
   } catch (error) {
     console.error('Error deleting question:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get questions filtered by various criteria
+ * @param {Object} filters - Filter criteria
+ * @param {string} [filters.courseId] - Course ID to filter by
+ * @param {string} [filters.topic] - Topic to filter by
+ * @param {string} [filters.difficulty] - Difficulty level to filter by
+ * @param {Array<string>} [filters.tagIds] - Array of tag IDs to filter by
+ * @returns {Promise<Array>} - Array of question objects
+ */
+export const getQuestionsByFilters = async (filters = {}) => {
+  try {
+    const { courseId, topic, difficulty, tagIds } = filters;
+    
+    // Start with a base query on the collection
+    let q = collection(db, COLLECTION_NAME);
+    let constraints = [];
+    
+    // Add filters based on provided criteria
+    if (courseId) {
+      constraints.push(where("course_id", "==", courseId));
+    }
+    
+    if (topic) {
+      constraints.push(where("topic", "==", topic));
+    }
+    
+    if (difficulty) {
+      constraints.push(where("difficulty", "==", difficulty));
+    }
+    
+    // Apply the constraints to the query
+    if (constraints.length > 0) {
+      q = query(q, ...constraints);
+    }
+    
+    // Execute the query
+    const snapshot = await getDocs(q);
+    let questions = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    // Filter by tags if specified (this needs to be done client-side because Firestore
+    // doesn't support array-contains-any with multiple array-contains conditions)
+    if (tagIds && tagIds.length > 0) {
+      questions = questions.filter(question => {
+        // If the question has no tags, it doesn't match
+        if (!question.tags || !Array.isArray(question.tags)) {
+          return false;
+        }
+        
+        // Check if the question has at least one of the specified tags
+        return tagIds.some(tagId => question.tags.includes(tagId));
+      });
+    }
+    
+    return questions;
+  } catch (error) {
+    console.error("Error getting questions by filters:", error);
     throw error;
   }
 };

@@ -1,17 +1,44 @@
 import { addCourse } from '../firebase/courseService';
 import { addQuestion } from '../firebase/questionService';
+import { addTag } from '../firebase/tagService';
+
+// Sample tags data
+const sampleTags = [
+  {
+    name: "Important",
+    color: "#EF4444" // Red
+  },
+  {
+    name: "Review",
+    color: "#F59E0B" // Amber
+  },
+  {
+    name: "Theory",
+    color: "#8B5CF6" // Violet
+  },
+  {
+    name: "Practice",
+    color: "#10B981" // Emerald
+  },
+  {
+    name: "Interview",
+    color: "#3B82F6" // Blue
+  }
+];
 
 // Sample courses data
 const sampleCourses = [
   {
     title: "Algorithms",
     description: "Fundamental algorithms and data structures for computer science",
-    color: "#4F46E5" // Indigo
+    color: "#4F46E5", // Indigo
+    topics: ["Time Complexity", "Searching Algorithms", "Sorting Algorithms", "Data Structures", "Dynamic Programming"]
   },
   {
     title: "Probability",
     description: "Mathematical foundations of probability theory and statistics",
-    color: "#10B981" // Emerald
+    color: "#10B981", // Emerald
+    topics: ["Probability Basics", "Conditional Probability", "Distributions", "Statistical Inference", "Bayesian Statistics"]
   }
 ];
 
@@ -24,7 +51,8 @@ const algorithmQuestions = [
     difficulty: "medium",
     type: "concept",
     estimated_time: 5,
-    topics: ["time complexity", "algorithm analysis"]
+    topic: "Time Complexity",
+    tags: ["Theory", "Important"] // Will be replaced with actual tag IDs
   },
   {
     title: "Binary Search Implementation",
@@ -33,7 +61,8 @@ const algorithmQuestions = [
     difficulty: "hard",
     type: "implementation",
     estimated_time: 10,
-    topics: ["binary search", "divide and conquer", "searching algorithms"]
+    topic: "Searching Algorithms",
+    tags: ["Practice", "Interview"] // Will be replaced with actual tag IDs
   },
   {
     title: "Linked List vs Array",
@@ -42,7 +71,8 @@ const algorithmQuestions = [
     difficulty: "easy",
     type: "concept",
     estimated_time: 5,
-    topics: ["data structures", "linked lists", "arrays"]
+    topic: "Data Structures",
+    tags: ["Theory", "Review"] // Will be replaced with actual tag IDs
   }
 ];
 
@@ -55,7 +85,8 @@ const probabilityQuestions = [
     difficulty: "hard",
     type: "concept",
     estimated_time: 8,
-    topics: ["conditional probability", "bayes theorem"]
+    topic: "Bayesian Statistics",
+    tags: ["Theory", "Important"] // Will be replaced with actual tag IDs
   },
   {
     title: "Expected Value",
@@ -64,7 +95,8 @@ const probabilityQuestions = [
     difficulty: "medium",
     type: "calculation",
     estimated_time: 5,
-    topics: ["expected value", "discrete probability"]
+    topic: "Distributions",
+    tags: ["Practice", "Review"] // Will be replaced with actual tag IDs
   },
   {
     title: "Probability Distributions",
@@ -73,7 +105,8 @@ const probabilityQuestions = [
     difficulty: "hard",
     type: "concept",
     estimated_time: 10,
-    topics: ["probability distributions", "statistics"]
+    topic: "Distributions",
+    tags: ["Theory", "Interview"] // Will be replaced with actual tag IDs
   }
 ];
 
@@ -82,7 +115,21 @@ export const seedDatabase = async () => {
   try {
     console.log('Starting database seeding...');
     
+    // Add tags first
+    console.log('Adding tags...');
+    const tagPromises = sampleTags.map(tag => addTag(tag));
+    const addedTags = await Promise.all(tagPromises);
+    
+    console.log('Tags added:', addedTags.map(tag => tag.name));
+    
+    // Create a map of tag names to tag IDs for easy lookup
+    const tagMap = {};
+    addedTags.forEach(tag => {
+      tagMap[tag.name] = tag.id;
+    });
+    
     // Add courses
+    console.log('Adding courses...');
     const algorithmsPromise = addCourse(sampleCourses[0]);
     const probabilityPromise = addCourse(sampleCourses[1]);
     
@@ -93,8 +140,24 @@ export const seedDatabase = async () => {
     
     console.log('Courses added:', algorithmsCourse.id, probabilityCourse.id);
     
+    // Process questions to replace tag names with tag IDs
+    const processedAlgorithmQuestions = algorithmQuestions.map(question => {
+      return {
+        ...question,
+        tags: question.tags.map(tagName => tagMap[tagName])
+      };
+    });
+    
+    const processedProbabilityQuestions = probabilityQuestions.map(question => {
+      return {
+        ...question,
+        tags: question.tags.map(tagName => tagMap[tagName])
+      };
+    });
+    
     // Add questions for Algorithms
-    const algorithmQuestionsPromises = algorithmQuestions.map(question => 
+    console.log('Adding algorithm questions...');
+    const algorithmQuestionsPromises = processedAlgorithmQuestions.map(question => 
       addQuestion({
         ...question,
         course_id: algorithmsCourse.id
@@ -102,7 +165,8 @@ export const seedDatabase = async () => {
     );
     
     // Add questions for Probability
-    const probabilityQuestionsPromises = probabilityQuestions.map(question => 
+    console.log('Adding probability questions...');
+    const probabilityQuestionsPromises = processedProbabilityQuestions.map(question => 
       addQuestion({
         ...question,
         course_id: probabilityCourse.id
@@ -118,7 +182,8 @@ export const seedDatabase = async () => {
     console.log('Database seeding completed successfully!');
     return {
       courses: [algorithmsCourse, probabilityCourse],
-      message: 'Database seeded successfully with sample courses and questions!'
+      tags: addedTags,
+      message: 'Database seeded successfully with sample courses, tags, and questions!'
     };
   } catch (error) {
     console.error('Error seeding database:', error);

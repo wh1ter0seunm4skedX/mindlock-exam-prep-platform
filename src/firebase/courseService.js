@@ -41,8 +41,19 @@ export const getCourseById = async (id) => {
 // Add a new course
 export const addCourse = async (courseData) => {
   try {
+    // Ensure topics is an array
+    let topics = courseData.topics || [];
+    if (typeof topics === 'string') {
+      try {
+        topics = JSON.parse(topics);
+      } catch (e) {
+        topics = [];
+      }
+    }
+    
     const newCourse = {
       ...courseData,
+      topics: topics || [],
       created_date: serverTimestamp(),
       updated_date: serverTimestamp(),
       is_sample: false
@@ -62,9 +73,20 @@ export const addCourse = async (courseData) => {
 // Update a course
 export const updateCourse = async (id, courseData) => {
   try {
+    // Ensure topics is an array
+    let topics = courseData.topics || [];
+    if (typeof topics === 'string') {
+      try {
+        topics = JSON.parse(topics);
+      } catch (e) {
+        topics = [];
+      }
+    }
+    
     const courseRef = doc(db, COLLECTION_NAME, id);
     const updatedData = {
       ...courseData,
+      topics: topics || [],
       updated_date: serverTimestamp()
     };
     

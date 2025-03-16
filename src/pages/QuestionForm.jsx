@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { addQuestion, updateQuestion, getQuestionById } from '../firebase/questionService';
+import { getTags } from '../firebase/tagService';
+import TagManager from '../components/TagManager';
 
 function QuestionForm({ questions = [], courses = [], setQuestions }) {
   const { id } = useParams();
@@ -14,13 +16,14 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
     answer: '',
     difficulty: 'medium',
     type: 'problem_solving',
-    topics: [],
+    topic: '',
+    tags: [],
     estimated_time: '15'
   });
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [topicsInput, setTopicsInput] = useState('');
+  const [availableTopics, setAvailableTopics] = useState([]);
 
   useEffect(() => {
     const fetchQuestion = async () => {
@@ -38,12 +41,10 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
               answer: existingQuestion.answer || '',
               difficulty: existingQuestion.difficulty || 'medium',
               type: existingQuestion.type || 'problem_solving',
-              topics: existingQuestion.topics || [],
+              topic: existingQuestion.topic || '',
+              tags: existingQuestion.tags || [],
               estimated_time: existingQuestion.estimated_time || '15'
             });
-            
-            // Set topics input for display
-            setTopicsInput(existingQuestion.topics ? existingQuestion.topics.join(', ') : '');
           } else {
             // If not found in the array, fetch from Firestore
             const questionData = await getQuestionById(id);
@@ -55,12 +56,10 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
                 answer: questionData.answer || '',
                 difficulty: questionData.difficulty || 'medium',
                 type: questionData.type || 'problem_solving',
-                topics: questionData.topics || [],
+                topic: questionData.topic || '',
+                tags: questionData.tags || [],
                 estimated_time: questionData.estimated_time || '15'
               });
-              
-              // Set topics input for display
-              setTopicsInput(questionData.topics ? questionData.topics.join(', ') : '');
             } else {
               setError('Question not found');
               navigate('/questions');
@@ -78,6 +77,25 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
     fetchQuestion();
   }, [id, isEditing, questions, navigate]);
 
+  // Update available topics when course_id changes
+  useEffect(() => {
+    if (formData.course_id) {
+      const selectedCourse = courses.find(c => c.id === formData.course_id);
+      if (selectedCourse && selectedCourse.topics && selectedCourse.topics.length > 0) {
+        setAvailableTopics(selectedCourse.topics);
+        
+        // If the current topic is not in the available topics, reset it
+        if (formData.topic && !selectedCourse.topics.includes(formData.topic)) {
+          setFormData(prev => ({ ...prev, topic: '' }));
+        }
+      } else {
+        setAvailableTopics([]);
+      }
+    } else {
+      setAvailableTopics([]);
+    }
+  }, [formData.course_id, courses]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -86,17 +104,10 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
     }));
   };
 
-  const handleTopicsChange = (e) => {
-    setTopicsInput(e.target.value);
-    // Convert comma-separated string to array
-    const topicsArray = e.target.value
-      .split(',')
-      .map(topic => topic.trim())
-      .filter(topic => topic !== '');
-    
+  const handleTagsChange = (selectedTagIds) => {
     setFormData(prev => ({
       ...prev,
-      topics: topicsArray
+      tags: selectedTagIds
     }));
   };
 
@@ -207,7 +218,7 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
 
           <div>
             <label htmlFor="content" className="block text-sm font-medium text-gray-700">
-              Question <span className="text-red-500">*</span>
+              Question Content <span className="text-red-500">*</span>
             </label>
             <textarea
               name="content"
@@ -236,7 +247,7 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="difficulty" className="block text-sm font-medium text-gray-700">
                 Difficulty
@@ -274,21 +285,30 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
                 ))}
               </select>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="topics" className="block text-sm font-medium text-gray-700">
-                Topics (comma-separated)
+              <label htmlFor="topic" className="block text-sm font-medium text-gray-700">
+                Topic
               </label>
-              <input
-                type="text"
-                id="topics"
-                value={topicsInput}
-                onChange={handleTopicsChange}
+              <select
+                id="topic"
+                name="topic"
+                value={formData.topic}
+                onChange={handleChange}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                placeholder="e.g., sorting, arrays, algorithms"
-              />
+              >
+                <option value="">Select a topic</option>
+                {availableTopics.map((topic, index) => (
+                  <option key={index} value={topic}>
+                    {topic}
+                  </option>
+                ))}
+              </select>
+              {availableTopics.length === 0 && formData.course_id && (
+                <p className="mt-1 text-xs text-amber-600">
+                  No topics available for this course. Add topics in the course settings.
+                </p>
+              )}
             </div>
 
             <div>
@@ -307,6 +327,14 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
             </div>
           </div>
 
+          {/* Tag Manager */}
+          <div>
+            <TagManager 
+              selectedTags={formData.tags} 
+              onChange={handleTagsChange} 
+            />
+          </div>
+
           <div className="flex justify-end space-x-3">
             <button
               type="button"
@@ -318,19 +346,9 @@ function QuestionForm({ questions = [], courses = [], setQuestions }) {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
             >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : (
-                'Save'
-              )}
+              {loading ? 'Saving...' : 'Save'}
             </button>
           </div>
         </form>

@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { deleteQuestion, getQuestionsByCourse } from '../firebase/questionService';
+import { deleteQuestion, getQuestionsByCourse, getQuestionsByFilters } from '../firebase/questionService';
+import QuestionFilters from '../components/QuestionFilters';
+import TagDisplay from '../components/TagDisplay';
+import TopicDisplay from '../components/TopicDisplay';
+import { getTags } from '../firebase/tagService';
 
 function QuestionList({ questions = [], courses = [], setQuestions }) {
   const { courseId } = useParams();
@@ -9,50 +13,85 @@ function QuestionList({ questions = [], courses = [], setQuestions }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(courseId || 'all');
+  const [selectedTopic, setSelectedTopic] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [allTags, setAllTags] = useState([]);
+
+  // Fetch all tags
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const tags = await getTags();
+        setAllTags(tags);
+      } catch (err) {
+        console.error('Error fetching tags:', err);
+      }
+    };
+    
+    fetchTags();
+  }, []);
 
   useEffect(() => {
     const filterQuestions = async () => {
       try {
-        let filtered = [...questions];
+        setIsLoading(true);
         
-        // If courseId is provided in URL, fetch questions for that course
+        // If courseId is provided in URL, use that as the selected course
         if (courseId && courseId !== 'all') {
-          // First check if we already have the questions in our state
-          const courseQuestions = questions.filter(q => q.course_id === courseId);
-          
-          // If we don't have any questions for this course in our state, fetch them
-          if (courseQuestions.length === 0) {
-            const fetchedQuestions = await getQuestionsByCourse(courseId);
-            filtered = fetchedQuestions;
-            // Update the global questions state with the fetched questions
-            setQuestions(prev => {
-              const existingIds = new Set(prev.map(q => q.id));
-              const newQuestions = fetchedQuestions.filter(q => !existingIds.has(q.id));
-              return [...prev, ...newQuestions];
-            });
-          } else {
-            filtered = courseQuestions;
-          }
-          
           setSelectedCourse(courseId);
-        } else if (selectedCourse && selectedCourse !== 'all') {
-          filtered = filtered.filter(q => q.course_id === selectedCourse);
         }
         
-        if (selectedDifficulty && selectedDifficulty !== 'all') {
-          filtered = filtered.filter(q => q.difficulty === selectedDifficulty);
+        // Prepare filter criteria
+        const filters = {
+          courseId: selectedCourse !== 'all' ? selectedCourse : null,
+          topic: selectedTopic !== 'all' ? selectedTopic : null,
+          difficulty: selectedDifficulty !== 'all' ? selectedDifficulty : null,
+          tagIds: selectedTags.length > 0 ? selectedTags : null
+        };
+        
+        // Check if we need to fetch questions or can filter from existing ones
+        let filtered = [];
+        
+        // If we have complex filters or no questions in state, fetch from Firestore
+        if (
+          (filters.tagIds && filters.tagIds.length > 0) || 
+          filters.topic || 
+          questions.length === 0
+        ) {
+          filtered = await getQuestionsByFilters(filters);
+          
+          // Update the global questions state with the fetched questions
+          setQuestions(prev => {
+            const existingIds = new Set(prev.map(q => q.id));
+            const newQuestions = filtered.filter(q => !existingIds.has(q.id));
+            return [...prev, ...newQuestions];
+          });
+        } else {
+          // Filter locally
+          filtered = [...questions];
+          
+          if (filters.courseId) {
+            filtered = filtered.filter(q => q.course_id === filters.courseId);
+          }
+          
+          if (filters.difficulty) {
+            filtered = filtered.filter(q => q.difficulty === filters.difficulty);
+          }
         }
         
         setFilteredQuestions(filtered);
       } catch (err) {
         console.error('Error filtering questions:', err);
         setError('Failed to load questions. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
     };
     
     filterQuestions();
-  }, [courseId, questions, selectedCourse, selectedDifficulty, setQuestions]);
+  }, [courseId, questions, selectedCourse, selectedTopic, selectedDifficulty, selectedTags, setQuestions]);
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this question?')) {
@@ -68,14 +107,6 @@ function QuestionList({ questions = [], courses = [], setQuestions }) {
         setIsDeleting(false);
       }
     }
-  };
-
-  const handleCourseChange = (e) => {
-    setSelectedCourse(e.target.value);
-  };
-
-  const handleDifficultyChange = (e) => {
-    setSelectedDifficulty(e.target.value);
   };
 
   const currentCourse = courses.find(c => c.id === selectedCourse);
@@ -106,56 +137,26 @@ function QuestionList({ questions = [], courses = [], setQuestions }) {
         </div>
       )}
 
-      <div className="bg-white shadow rounded-lg p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="course-filter" className="block text-sm font-medium text-gray-700">
-              Filter by Course
-            </label>
-            <select
-              id="course-filter"
-              name="course-filter"
-              value={selectedCourse}
-              onChange={handleCourseChange}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            >
-              <option value="all">All Courses</option>
-              {courses.map(course => (
-                <option key={course.id} value={course.id}>
-                  {course.title}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label htmlFor="difficulty-filter" className="block text-sm font-medium text-gray-700">
-              Filter by Difficulty
-            </label>
-            <select
-              id="difficulty-filter"
-              name="difficulty-filter"
-              value={selectedDifficulty}
-              onChange={handleDifficultyChange}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            >
-              <option value="all">All Difficulties</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      <QuestionFilters
+        courses={courses}
+        selectedCourse={selectedCourse}
+        selectedTopic={selectedTopic}
+        selectedDifficulty={selectedDifficulty}
+        selectedTags={selectedTags}
+        onCourseChange={setSelectedCourse}
+        onTopicChange={setSelectedTopic}
+        onDifficultyChange={setSelectedDifficulty}
+        onTagsChange={setSelectedTags}
+      />
 
-      {isDeleting && (
+      {(isLoading || isDeleting) && (
         <div className="flex justify-center items-center my-4">
           <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
-          <span className="ml-2 text-gray-600">Deleting...</span>
+          <span className="ml-2 text-gray-600">{isDeleting ? 'Deleting...' : 'Loading...'}</span>
         </div>
       )}
 
-      {filteredQuestions.length === 0 ? (
+      {!isLoading && filteredQuestions.length === 0 ? (
         <div className="text-center py-12 bg-white shadow rounded-lg">
           <svg
             className="mx-auto h-12 w-12 text-gray-400"
@@ -173,7 +174,7 @@ function QuestionList({ questions = [], courses = [], setQuestions }) {
           </svg>
           <h3 className="mt-2 text-sm font-medium text-gray-900">No questions found</h3>
           <p className="mt-1 text-sm text-gray-500">
-            {selectedCourse !== 'all' || selectedDifficulty !== 'all'
+            {selectedCourse !== 'all' || selectedTopic !== 'all' || selectedDifficulty !== 'all' || selectedTags.length > 0
               ? 'Try changing your filters or add a new question.'
               : 'Get started by creating a new question.'}
           </p>
@@ -192,6 +193,7 @@ function QuestionList({ questions = [], courses = [], setQuestions }) {
           <ul className="divide-y divide-gray-200">
             {filteredQuestions.map((question) => {
               const course = courses.find(c => c.id === question.course_id);
+              const questionTags = allTags.filter(tag => question.tags && question.tags.includes(tag.id));
               
               return (
                 <li key={question.id}>
@@ -201,7 +203,7 @@ function QuestionList({ questions = [], courses = [], setQuestions }) {
                         <p className="text-lg font-medium text-indigo-600 truncate">
                           {question.title || question.content.substring(0, 50)}
                         </p>
-                        <div className="mt-2 flex items-center text-sm text-gray-500">
+                        <div className="mt-2 flex flex-wrap items-center text-sm text-gray-500 gap-2">
                           {course && (
                             <div className="flex items-center mr-4">
                               <div 
@@ -211,20 +213,28 @@ function QuestionList({ questions = [], courses = [], setQuestions }) {
                               <span>{course.title}</span>
                             </div>
                           )}
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 ml-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                             {question.difficulty || 'medium'}
                           </span>
                           {question.type && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ml-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               {question.type}
                             </span>
                           )}
                           {question.estimated_time && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               {question.estimated_time} min
                             </span>
                           )}
+                          {question.topic && (
+                            <TopicDisplay topic={question.topic} />
+                          )}
                         </div>
+                        {questionTags.length > 0 && (
+                          <div className="mt-2">
+                            <TagDisplay tags={questionTags} />
+                          </div>
+                        )}
                       </div>
                       <div className="flex space-x-2">
                         <Link
