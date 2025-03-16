@@ -9,6 +9,7 @@ import QuestionForm from './pages/QuestionForm.jsx';
 import StudyMode from './pages/StudyMode.jsx';
 import NotFound from './pages/NotFound.jsx';
 import DatabaseSeeder from './components/DatabaseSeeder.jsx';
+import AdminPanel from './pages/AdminPanel.jsx';
 import { getCourses } from './firebase/courseService.js';
 import { getQuestions } from './firebase/questionService.js';
 
@@ -92,6 +93,7 @@ function App() {
               <Route path="/study/:courseId?" element={<StudyMode questions={questions} courses={courses} />} />
               
               <Route path="/setup" element={<DatabaseSeeder />} />
+              <Route path="/admin" element={<AdminPanel />} />
               
               <Route path="*" element={<NotFound />} />
             </Routes>

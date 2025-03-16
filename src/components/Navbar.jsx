@@ -12,6 +12,7 @@ function Navbar() {
     { name: 'Questions', href: '/questions' },
     { name: 'Study Mode', href: '/study' },
     { name: 'Setup', href: '/setup' },
+    { name: 'Admin Panel', href: '/admin' },
   ];
 
   const isActive = (path) => {
